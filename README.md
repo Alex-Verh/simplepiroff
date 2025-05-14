@@ -8,7 +8,7 @@ This project runs controlled experiments using the **SimplePIR** protocol on the
 
 ### 1. Download the Dataset (~0.9 GB)
 
-Download the compressed CSV file from the Open Food Facts website:
+Download the compressed CSV file in the `./db` directory from the Open Food Facts website:
 
 **[Download Link](https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz)**  
 _(Compressed: ~0.9 GB, Uncompressed: ~9 GB)_
@@ -18,6 +18,10 @@ More info at: https://world.openfoodfacts.org/data
 ---
 
 ### 2. Unzip the `.gz` File
+
+```bash
+cd db
+```
 
 #### ▸ macOS or Linux
 
@@ -51,7 +55,33 @@ gunzip en.openfoodfacts.org.products.csv.gz
 
 ### 3. Convert CSV to PIR Format
 
+Create a virtual environment:
+
+#### ▸ macOS or Linux
+
+```bash
+python3 -m venv venv
+
+source venv/bin/activate
+```
+
+#### ▸ Windows
+
+```bash
+python -m venv venv
+
+venv\Scripts\activate
+```
+
 Install all the dependencies:
+
+#### ▸ macOS or Linux
+
+```bash
+pip3 install -r requirements.txt
+```
+
+#### ▸ Windows
 
 ```bash
 pip install -r requirements.txt

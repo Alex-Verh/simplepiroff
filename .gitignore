@@ -1,2 +1,4 @@
 /db/*
 /simplepir
+/venv
+.DS_Store
