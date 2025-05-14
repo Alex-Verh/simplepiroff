@@ -47,6 +47,8 @@ Alternatively, use WSL:
 gunzip en.openfoodfacts.org.products.csv.gz
 ```
 
+---
+
 ### 3. Convert CSV to PIR Format
 
 Install all the dependencies:
@@ -68,3 +70,5 @@ python3 csv_formatter.py
 ```bash
 py csv_formatter.py
 ```
+
+---
