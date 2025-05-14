@@ -72,3 +72,37 @@ py csv_formatter.py
 ```
 
 ---
+
+## Run protocol over dataset
+
+### 1. Clone SimplePIR repository
+
+In the root directory run:
+
+```bash
+git clone https://github.com/ahenzinger/simplepir.git
+```
+
+---
+
+### 2. Setup SimplePIR protocol
+
+Follow up setup indications in `README.md` inside the `./simplepir`
+
+Run correctness tests:
+
+```bash
+cd simplepir/pir/
+go test
+cd ../..
+```
+
+---
+
+### 3. Run a basic test query
+
+```bash
+
+```
+
+---
