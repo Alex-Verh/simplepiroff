@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 	"strings"
-	"bufio"
 )
 
 const LOGQ = uint64(32)
@@ -688,35 +687,3 @@ func BenchmarkDoublePirBatchLarge(b *testing.B) {
 	}
 }
 
-func TestSimplePirOnRealDB(t *testing.T) {
-    pir := SimplePIR{}
-    rowLength := uint64(8) // or whatever your entry size is in bits
-    dbPath := "../../db/database.txt" // adjust path as needed
-
-    // First, count the number of entries in your file if needed
-    // Or just let LoadDBFromFile handle it
-
-    // Pick parameters
-    // You may want to set N = number of entries in your file
-    file, _ := os.Open(dbPath)
-    defer file.Close()
-    scanner := bufio.NewScanner(file)
-    N := uint64(0)
-    for scanner.Scan() {
-        N++
-    }
-
-    p := pir.PickParams(N, rowLength, SEC_PARAM, LOGQ)
-    DB := LoadDBFromFile(dbPath, rowLength, &p)
-
-	for i := uint64(0); i < 10; i++ {
-        v := DB.GetElem(i)
-        fmt.Printf("PIR DB.GetElem(%d) = %d\n", i, v)
-        if v == 54 {
-            fmt.Printf("Index of 54 in PIR DB: %d\n", i)
-        }
-    }
-
-    // Run a query (e.g., query the first entry)
-    RunPIR(&pir, DB, p, []uint64{0})
-}
