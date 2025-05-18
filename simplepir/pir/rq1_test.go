@@ -10,15 +10,15 @@ import (
     "testing"
 )
 
-func QueryProductByID(t *testing.T, productID uint64, testDBSize uint64) {
+func QueryProductByID(t *testing.T, productID uint64, DBSize uint64, recordSize uint64) {
     pir := SimplePIR{}
     dbPath := "../../db/database.txt"
 
-    maxRecordSize, actualDBSize := AutoDetectRowLength(dbPath)
+    actualRecordSize, actualDBSize := AutoDetectRowLength(dbPath)
 
     dbSizeToUse := actualDBSize
-    if testDBSize > 0 && testDBSize < actualDBSize {
-        dbSizeToUse = testDBSize
+    if DBSize > 0 && DBSize < actualDBSize {
+        dbSizeToUse = DBSize
         fmt.Printf("Testing with reduced DB size: %d entries (of %d total)\n", 
         dbSizeToUse, actualDBSize)
     }
@@ -48,8 +48,28 @@ func QueryProductByID(t *testing.T, productID uint64, testDBSize uint64) {
         }
     }
 
-    p := pir.PickParams(dbSizeToUse, maxRecordSize, SEC_PARAM, LOGQ)
-    DB := MakeDB(dbSizeToUse, maxRecordSize, &p, limitedVals)
+    // if recordSize is 0, use the max record size from the db
+    recordSizeToUse := actualRecordSize
+    if recordSize > 0 && recordSize < actualRecordSize {
+        fmt.Printf("Testing with reduced record size: %d bits (of %d total)\n",
+                   recordSize, actualRecordSize)
+        recordSizeToUse = recordSize
+
+        maxValueForRecordSize := uint64((1 << recordSizeToUse) - 1)
+
+        for i := range limitedVals {
+            limitedVals[i] = limitedVals[i] % (maxValueForRecordSize + 1)
+        }
+
+        fmt.Printf("Values adjusted to fit exactly in %d bits (max possible value: %d)\n",
+            recordSizeToUse, maxValueForRecordSize)
+    }
+
+    // adjust the database size to match the number of values read (cause: duplicates)
+    dbSizeToUse = uint64(len(limitedVals))
+
+    p := pir.PickParams(dbSizeToUse, recordSizeToUse, SEC_PARAM, LOGQ)
+    DB := MakeDB(dbSizeToUse, recordSizeToUse, &p, limitedVals)
 
     var queryIndex uint64
     var found bool = false
@@ -133,17 +153,44 @@ func TestQueryProduct(t *testing.T) {
     }
     
     fmt.Printf("Querying for product ID: %d\n", productID)
-    QueryProductByID(t, productID, 0)
+    QueryProductByID(t, productID, 0, 0)
 }
 
 // go test -run=TestPIRWithDifferentDBSizes
 // test using different DB sizes
 func TestPIRWithDifferentDBSizes(t *testing.T) {
-    sizes := []uint64{10, 100, 1000, 10000, 100000, 1000000}
+    dbSizes := []uint64{10, 100, 1000, 10000, 100000, 1000000}
     productID := uint64(54) // first product ID in the database
     
-    for _, size := range sizes {
-        fmt.Printf("\n\n==== Testing PIR with %d entries ====\n", size)
-        QueryProductByID(t, productID, size)
+    for _, dbSize := range dbSizes {
+        fmt.Printf("\n\n==== Testing PIR with %d entries ====\n", dbSize)
+        QueryProductByID(t, productID, dbSize, 0)
+    }
+}
+
+// go test -run=TestPIRWithDifferentRecordSizes
+// test using different record sizes
+func TestPIRWithDifferentRecordSizes(t *testing.T) {
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256}
+    productID := uint64(54) // first product ID in the database
+    
+    for _, recordSize := range recordSizes {
+        fmt.Printf("\n\n==== Testing PIR with record size %d bits ====\n", recordSize)
+        QueryProductByID(t, productID, 0, recordSize)
+    }
+}
+
+// go test -run=TestPIRWithSizeCombinations
+// test using different record sizes and DB sizes
+func TestPIRWithSizeCombinations(t *testing.T) {
+    dbSizes := []uint64{10, 100, 1000, 10000, 100000, 1000000}
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256}
+    productID := uint64(54) // first product ID in the database
+
+    for _, dbSize := range dbSizes {
+        for _, recordSize := range recordSizes {
+            fmt.Printf("\n\n==== Testing PIR with DB size %d and record size %d bits ====\n", dbSize, recordSize)
+            QueryProductByID(t, productID, dbSize, recordSize)
+        }
     }
 }
