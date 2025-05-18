@@ -2,6 +2,7 @@ package pir
 
 import (
     "bufio"
+    "encoding/binary"
     "fmt"
     "math"
     "os"
@@ -12,69 +13,60 @@ import (
 
 func QueryProductByID(t *testing.T, productID uint64, DBSize uint64, recordSize uint64) {
     pir := SimplePIR{}
-    dbPath := "../../db/database.txt"
-
-    actualRecordSize, actualDBSize := AutoDetectRowLength(dbPath)
-
-    dbSizeToUse := actualDBSize
-    if DBSize > 0 && DBSize < actualDBSize {
-        dbSizeToUse = DBSize
-        fmt.Printf("Testing with reduced DB size: %d entries (of %d total)\n", 
-        dbSizeToUse, actualDBSize)
-    }
-
-    file, _ := os.Open(dbPath)
-    defer file.Close()
-    scanner := bufio.NewScanner(file)
+    txtPath := "../../db/database.txt"
+    binPath := "../../db/database.bin"
     
     var limitedVals []uint64
-    count := uint64(0)
+    var actualRecordSize uint64
+    var actualDBSize uint64
+    var err error
     
-    for scanner.Scan() && count < dbSizeToUse {
-        line := strings.TrimSpace(scanner.Text())
-        if line == "" {
-            continue
-        }
-        
-        fields := strings.FieldsFunc(line, func(r rune) bool {
-            return r == ':' || r == '\t' || r == ' '
-        })
-        
-        if len(fields) > 0 {
-            if val, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
-                limitedVals = append(limitedVals, val)
-                count++
-            }
+    if _, err := os.Stat(binPath); err == nil {
+        fmt.Println("Using binary database file for faster loading")
+        limitedVals, actualRecordSize, actualDBSize, err = LoadValuesFromBinary(binPath, DBSize)
+        if err != nil {
+            fmt.Printf("Warning: Failed to load binary database: %v\nFalling back to text file.\n", err)
         }
     }
+    
+    if limitedVals == nil {
+        fmt.Println("Using text database file")
+        limitedVals, actualRecordSize, actualDBSize, err = LoadValuesFromText(txtPath, DBSize)
+        if err != nil {
+            t.Fatalf("Failed to load database: %v", err)
+        }
+    }
+    
+    fmt.Printf("Database has %d total entries, using %d entries for this test\n", 
+        actualDBSize, len(limitedVals))
 
-    // if recordSize is 0, use the max record size from the db
     recordSizeToUse := actualRecordSize
-    if recordSize > 0 && recordSize < actualRecordSize {
-        fmt.Printf("Testing with reduced record size: %d bits (of %d total)\n",
+    if recordSize > 0 {
+        fmt.Printf("Using specified record size: %d bits (auto-detected: %d bits)\n",
                    recordSize, actualRecordSize)
         recordSizeToUse = recordSize
-
-        maxValueForRecordSize := uint64((1 << recordSizeToUse) - 1)
-
-        for i := range limitedVals {
-            limitedVals[i] = limitedVals[i] % (maxValueForRecordSize + 1)
+        
+        if recordSize < actualRecordSize {
+            maxValueForRecordSize := uint64((1 << recordSizeToUse) - 1)
+            
+            for i := range limitedVals {
+                limitedVals[i] = limitedVals[i] % (maxValueForRecordSize + 1)
+            }
+            
+            fmt.Printf("Values adjusted to fit in %d bits (max possible value: %d)\n",
+                      recordSizeToUse, maxValueForRecordSize)
         }
-
-        fmt.Printf("Values adjusted to fit exactly in %d bits (max possible value: %d)\n",
-            recordSizeToUse, maxValueForRecordSize)
     }
-
-    // adjust the database size to match the number of values read (cause: duplicates)
-    dbSizeToUse = uint64(len(limitedVals))
-
+    
+    dbSizeToUse := uint64(len(limitedVals))
+    
     p := pir.PickParams(dbSizeToUse, recordSizeToUse, SEC_PARAM, LOGQ)
     DB := MakeDB(dbSizeToUse, recordSizeToUse, &p, limitedVals)
-
+    
     var queryIndex uint64
     var found bool = false
-
-	for i := uint64(0); i < dbSizeToUse; i++ {
+    
+    for i := uint64(0); i < dbSizeToUse; i++ {
         v := DB.GetElem(i)
         if v == productID {
             queryIndex = i
@@ -85,14 +77,12 @@ func QueryProductByID(t *testing.T, productID uint64, DBSize uint64, recordSize 
     }
     
     if !found {
-		fmt.Printf("Product ID %d not found in the database\n", productID)
+        fmt.Printf("Product ID %d not found in the database\n", productID)
         return
     }
-
+    
     fmt.Printf("Running PIR query for product ID %d at index %d...\n", productID, queryIndex)
-    
     RunPIR(&pir, DB, p, []uint64{queryIndex})
-    
     fmt.Printf("Successfully retrieved product ID %d\n", productID)
 }
 
@@ -193,4 +183,100 @@ func TestPIRWithSizeCombinations(t *testing.T) {
             QueryProductByID(t, productID, dbSize, recordSize)
         }
     }
+}
+
+//  LOADING DATABASE FUNCTIONS -----------------------------------------------------------------------------
+
+func LoadValuesFromText(txtPath string, limit uint64) ([]uint64, uint64, uint64, error) {
+    rowLength, totalCount := AutoDetectRowLength(txtPath)
+    
+    readCount := totalCount
+    if limit > 0 && limit < totalCount {
+        readCount = limit
+        fmt.Printf("Testing with reduced DB size: %d entries (of %d total)\n", 
+                  readCount, totalCount)
+    }
+    
+    file, err := os.Open(txtPath)
+    if err != nil {
+        return nil, 0, 0, fmt.Errorf("error opening text file: %v", err)
+    }
+    defer file.Close()
+    
+    scanner := bufio.NewScanner(file)
+    var values []uint64
+    count := uint64(0)
+    
+    for scanner.Scan() && count < readCount {
+        line := strings.TrimSpace(scanner.Text())
+        if line == "" {
+            continue
+        }
+        
+        fields := strings.FieldsFunc(line, func(r rune) bool {
+            return r == ':' || r == '\t' || r == ' '
+        })
+        
+        if len(fields) > 0 {
+            if val, err := strconv.ParseUint(fields[0], 10, 64); err == nil {
+                values = append(values, val)
+                count++
+            }
+        }
+    }
+    
+    fmt.Printf("Text loading completed: %d values\n", len(values))
+    return values, rowLength, totalCount, nil
+}
+
+func LoadValuesFromBinary(binPath string, limit uint64) ([]uint64, uint64, uint64, error) {
+    file, err := os.Open(binPath)
+    if err != nil {
+        return nil, 0, 0, fmt.Errorf("error opening binary file: %v", err)
+    }
+    defer file.Close()
+    
+    var totalCount uint64
+    err = binary.Read(file, binary.LittleEndian, &totalCount)
+    if err != nil {
+        return nil, 0, 0, fmt.Errorf("error reading count: %v", err)
+    }
+    
+    readCount := totalCount
+    if limit > 0 && limit < totalCount {
+        readCount = limit
+        fmt.Printf("Testing with reduced DB size: %d entries (of %d total)\n", 
+                  readCount, totalCount)
+    }
+    
+    values := make([]uint64, readCount)
+    
+    for i := uint64(0); i < readCount; i++ {
+        err = binary.Read(file, binary.LittleEndian, &values[i])
+        if err != nil {
+            return nil, 0, 0, fmt.Errorf("error reading value at index %d: %v", i, err)
+        }
+        
+        if i > 0 && i%1000000 == 0 {
+            fmt.Printf("Loaded %d/%d values (%.1f%%)...\n", i, readCount, float64(i)/float64(readCount)*100)
+        }
+    }
+
+    var maxVal uint64 = 0
+    for _, val := range values {
+        if val > maxVal {
+            maxVal = val
+        }
+    }
+    
+    var rowLength uint64 = 32
+    if maxVal > 0 {
+        rowLength = uint64(math.Ceil(math.Log2(float64(maxVal + 1))))
+        rowLength = ((rowLength + 7) / 8) * 8 
+    }
+    
+    fmt.Printf("Binary loading completed: %d values (max value: %d, row length: %d bits)\n", 
+              len(values), maxVal, rowLength)
+    
+    return values, rowLength, totalCount, nil
 }

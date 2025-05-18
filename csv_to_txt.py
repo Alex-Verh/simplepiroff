@@ -1,6 +1,6 @@
 import pandas as pd
 
-def convert_csv_to_pir_format(csv_path, output_path, chunk_size=100000):
+def convert_csv_to_txt_format(csv_path, output_path, chunk_size=100000):
     products = []
     total = 0
     valid = 0
@@ -23,4 +23,4 @@ def convert_csv_to_pir_format(csv_path, output_path, chunk_size=100000):
 if __name__ == "__main__":
     input_csv = "db/en.openfoodfacts.org.products.csv"
     output_txt = "db/database.txt"
-    convert_csv_to_pir_format(input_csv, output_txt)
+    convert_csv_to_txt_format(input_csv, output_txt)

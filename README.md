@@ -92,13 +92,17 @@ From the project root directory, run:
 #### ▸ macOS or Linux
 
 ```bash
-python3 csv_formatter.py
+python3 csv_to_txt.py
+
+python3 txt_to_bin.py
 ```
 
 #### ▸ Windows
 
 ```bash
-py csv_formatter.py
+py csv_to_txt.py
+
+py txt_to_bin.py
 ```
 
 ---
