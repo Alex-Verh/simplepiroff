@@ -133,10 +133,58 @@ cd ../..
 
 ---
 
-### 3. Run a basic test query
+### 3. Research Question 1
+
+#### TestQueryProduct: Queries a specific product ID from the database.
+
+1. Set the ID using the PRODUCT_ID environment variable
+2. Uses the full database by default
+
 
 ```bash
+# Navigate to the test directory
+cd simplepir/pir/
 
+# Test querying a specific product ID
+# Replace 63 with any product ID you want to search for
+PRODUCT_ID=63 go test -run=TestQueryProduct
+```
+
+---
+
+
+## Answering Research Question
+
+### Sub-question I 
+
+#### TestPIRWithDifferentDBSizes: Tests PIR performance with varying database sizes
+
+1. Tests with 10, 100, 1,000, 10,000, 100,000, and 1,000,000 entries
+2. Helps measure how PIR scales with more data
+
+#### TestPIRWithDifferentRecordSizes: Tests PIR with different record sizes
+
+1. Tests with 8, 16, 32, 64, 128, and 256-bit records
+2. Shows how PIR performs with larger record sizes
+
+#### TestPIRWithSizeCombinations: Tests all combinations of database sizes and record sizes
+
+1. Runs the most comprehensive benchmark
+2. Takes the longest to complete [~1min]
+
+```bash
+# Navigate to the test directory
+cd simplepir/pir/
+
+# Test PIR with different database sizes (10 to 1,000,000 entries)
+go test -run=TestPIRWithDifferentDBSizes
+
+# Test PIR with different record sizes (8 to 256 bits)
+go test -run=TestPIRWithDifferentRecordSizes
+
+# Test PIR with combinations of different DB sizes and record sizes
+# This will run multiple tests with all combinations
+go test -run=TestPIRWithSizeCombinations
 ```
 
 ---
