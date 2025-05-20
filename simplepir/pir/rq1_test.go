@@ -3,12 +3,16 @@ package pir
 import (
     "bufio"
     "encoding/binary"
+    "encoding/csv"
     "fmt"
+    "io"
     "math"
     "os"
+    "regexp"
     "strconv"
     "strings"
     "testing"
+    "sort"
 )
 
 func QueryProductByID(t *testing.T, productID uint64, DBSize uint64, recordSize uint64) {
@@ -149,43 +153,79 @@ func TestQueryProduct(t *testing.T) {
 // go test -run=TestPIRWithDifferentDBSizes
 // test using different DB sizes
 func TestPIRWithDifferentDBSizes(t *testing.T) {
-    dbSizes := []uint64{10, 100, 1000, 10000, 100000, 1000000}
+    dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
     productID := uint64(54) // first product ID in the database
     
     for _, dbSize := range dbSizes {
         fmt.Printf("\n\n==== Testing PIR with %d entries ====\n", dbSize)
-        QueryProductByID(t, productID, dbSize, 0)
+        
+        output := CaptureOutput(func() {
+            QueryProductByID(t, productID, dbSize, 0)
+        })
+        
+        metrics := ExtractPIRMetrics(output)
+        
+        params := map[string]string{
+            "db_size": fmt.Sprintf("%d", dbSize),
+            "record_size": "auto",
+        }
+        
+        LogTestResults("dbsize", params, metrics)
     }
 }
 
 // go test -run=TestPIRWithDifferentRecordSizes
 // test using different record sizes
 func TestPIRWithDifferentRecordSizes(t *testing.T) {
-    recordSizes := []uint64{8, 16, 32, 64, 128, 256}
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512, 1024}
     productID := uint64(54) // first product ID in the database
     
     for _, recordSize := range recordSizes {
         fmt.Printf("\n\n==== Testing PIR with record size %d bits ====\n", recordSize)
-        QueryProductByID(t, productID, 0, recordSize)
+
+        output := CaptureOutput(func() {
+            QueryProductByID(t, productID, 0, recordSize)
+        })
+        
+        metrics := ExtractPIRMetrics(output)
+        
+        params := map[string]string{
+            "db_size": "auto", 
+            "record_size": fmt.Sprintf("%d", recordSize),
+        }
+
+        LogTestResults("recordsize", params, metrics)
     }
 }
 
 // go test -run=TestPIRWithSizeCombinations
 // test using different record sizes and DB sizes
 func TestPIRWithSizeCombinations(t *testing.T) {
-    dbSizes := []uint64{10, 100, 1000, 10000, 100000, 1000000}
-    recordSizes := []uint64{8, 16, 32, 64, 128, 256}
+    dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512, 1024}
     productID := uint64(54) // first product ID in the database
 
     for _, dbSize := range dbSizes {
         for _, recordSize := range recordSizes {
             fmt.Printf("\n\n==== Testing PIR with DB size %d and record size %d bits ====\n", dbSize, recordSize)
-            QueryProductByID(t, productID, dbSize, recordSize)
+
+            output := CaptureOutput(func() {
+                QueryProductByID(t, productID, dbSize, recordSize)
+            })
+            
+            metrics := ExtractPIRMetrics(output)
+            
+            params := map[string]string{
+                "db_size": fmt.Sprintf("%d", dbSize),
+                "record_size": fmt.Sprintf("%d", recordSize),
+            }
+
+            LogTestResults("db_recordsize", params, metrics)
         }
     }
 }
 
-//  LOADING DATABASE FUNCTIONS -----------------------------------------------------------------------------
+//  LOADING DATABASE FUNCTIONS -----------------------------------------------------------------------------------------------
 
 func LoadValuesFromText(txtPath string, limit uint64) ([]uint64, uint64, uint64, error) {
     rowLength, totalCount := AutoDetectRowLength(txtPath)
@@ -279,4 +319,119 @@ func LoadValuesFromBinary(binPath string, limit uint64) ([]uint64, uint64, uint6
               len(values), maxVal, rowLength)
     
     return values, rowLength, totalCount, nil
+}
+
+
+// CAPTURING AND EXTRACTION OUTPUT FUNCTIONS -----------------------------------------------------------------------------
+
+func CaptureOutput(f func()) string {
+    old := os.Stdout
+    r, w, _ := os.Pipe()
+    os.Stdout = w
+    
+    f() 
+    
+    w.Close()
+    os.Stdout = old
+    
+    var buf strings.Builder
+    io.Copy(&buf, r)
+
+    fmt.Print(buf.String())
+
+    return buf.String()
+}
+
+func ExtractPIRMetrics(output string) map[string]float64 {
+    metrics := make(map[string]float64)
+    
+    // regex patterns
+    patterns := map[string]string{
+        "setup_time":      `Setup\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "query_time":      `Building query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "answer_time":     `Answering query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "reconstruct_time": `Reconstructing\.\.\.\s+Success!\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "offline_download": `Offline download: ([\d\.]+) KB`,
+        "online_upload":    `Online upload: ([\d\.]+) KB`,
+        "online_download":  `Online download: ([\d\.]+) KB`,
+    }
+    
+    convertToMs := func(value float64, unit string) float64 {
+        switch unit {
+        case "µs": return value / 1000
+        case "ms": return value
+        case "s":  return value * 1000
+        default:   return value
+        }
+    }
+    
+    for name, pattern := range patterns {
+        re := regexp.MustCompile(pattern)
+        if matches := re.FindStringSubmatch(output); len(matches) >= 3 {
+            value, _ := strconv.ParseFloat(matches[1], 64)
+            
+            if strings.HasSuffix(name, "_time") {
+                value = convertToMs(value, matches[2])
+            }
+            
+            metrics[name] = value
+        }
+    }
+    
+    return metrics
+}
+
+
+// LOGGING RESULTS FUNCTION --------------------------------------------------------------------------------------------------
+
+func LogTestResults(testName string, params map[string]string, metrics map[string]float64) {
+    os.MkdirAll("../../results", 0755)
+    filename := fmt.Sprintf("../../results/%s_results.csv", testName)
+    
+    fileExists := false
+    if _, err := os.Stat(filename); err == nil {
+        fileExists = true
+    }
+    
+    file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+        fmt.Printf("Warning: Failed to log results: %v\n", err)
+        return
+    }
+    defer file.Close()
+    
+    writer := csv.NewWriter(file)
+    defer writer.Flush()
+    
+    var paramKeys []string
+    var metricKeys []string
+    
+    for k := range params {
+        paramKeys = append(paramKeys, k)
+    }
+    sort.Strings(paramKeys) 
+    
+    for k := range metrics {
+        metricKeys = append(metricKeys, k)
+    }
+    sort.Strings(metricKeys)
+    
+    if !fileExists {
+        var header []string
+        header = append(header, paramKeys...)
+        header = append(header, metricKeys...)
+        writer.Write(header)
+    }
+    
+    var row []string
+    
+    for _, k := range paramKeys {
+        row = append(row, params[k])
+    }
+    
+    for _, k := range metricKeys {
+        row = append(row, fmt.Sprintf("%.6f", metrics[k]))
+    }
+    
+    writer.Write(row)
 }
