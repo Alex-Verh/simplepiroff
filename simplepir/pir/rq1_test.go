@@ -343,14 +343,27 @@ func CaptureOutput(f func()) string {
 }
 
 func ExtractPIRMetrics(output string) map[string]float64 {
-    metrics := make(map[string]float64)
+    // Initialize all expected metrics with zero values
+    metrics := map[string]float64{
+        "setup_time":       0.0,
+        "query_time":       0.0,
+        "answer_time":      0.0,
+        "reconstruct_time": 0.0,
+        "offline_download": 0.0,
+        "online_upload":    0.0,
+        "online_download":  0.0,
+    }
     
-    // regex patterns
-    patterns := map[string]string{
-        "setup_time":      `Setup\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
-        "query_time":      `Building query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
-        "answer_time":     `Answering query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+    // Time metrics regex patterns
+    timePatterns := map[string]string{
+        "setup_time":       `Setup\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "query_time":       `Building query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+        "answer_time":      `Answering query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
         "reconstruct_time": `Reconstructing\.\.\.\s+Success!\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
+    }
+    
+    // Data transfer metrics regex patterns
+    dataPatterns := map[string]string{
         "offline_download": `Offline download: ([\d\.]+) KB`,
         "online_upload":    `Online upload: ([\d\.]+) KB`,
         "online_download":  `Online download: ([\d\.]+) KB`,
@@ -365,22 +378,38 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         }
     }
     
-    for name, pattern := range patterns {
+    // Keep track of which metrics were found
+    metricsFound := make(map[string]bool)
+    
+    // Extract time metrics (they have units like µs, ms, s)
+    for name, pattern := range timePatterns {
         re := regexp.MustCompile(pattern)
         if matches := re.FindStringSubmatch(output); len(matches) >= 3 {
             value, _ := strconv.ParseFloat(matches[1], 64)
-            
-            if strings.HasSuffix(name, "_time") {
-                value = convertToMs(value, matches[2])
-            }
-            
+            metrics[name] = convertToMs(value, matches[2])
+            metricsFound[name] = true
+        }
+    }
+    
+    // Extract data transfer metrics (they are in KB)
+    for name, pattern := range dataPatterns {
+        re := regexp.MustCompile(pattern)
+        if matches := re.FindStringSubmatch(output); len(matches) >= 2 {
+            value, _ := strconv.ParseFloat(matches[1], 64)
             metrics[name] = value
+            metricsFound[name] = true
+        }
+    }
+    
+    // Debug: print warning for missing metrics
+    for name := range metrics {
+        if !metricsFound[name] {
+            fmt.Printf("Warning: Metric '%s' not found in output\n", name)
         }
     }
     
     return metrics
 }
-
 
 // LOGGING RESULTS FUNCTION --------------------------------------------------------------------------------------------------
 
@@ -434,4 +463,182 @@ func LogTestResults(testName string, params map[string]string, metrics map[strin
     }
     
     writer.Write(row)
+}
+
+// RUNNING THE TESTS MULTIPLE TIMES------------------------------------------------------------------------------------------------------------
+func RunTestMultipleTimes(t *testing.T, runCount int, testFunc func() (map[string]string, map[string]float64)) {
+    if runCount <= 0 {
+        runCount = 1
+    }
+    
+    allMetrics := make([]map[string]float64, runCount)
+    var params map[string]string
+    
+    fmt.Printf("\n===== Run 1 of %d =====\n", runCount)
+    p, metrics := testFunc()
+    allMetrics[0] = metrics
+    params = p // Params should be the same for all runs
+    
+    expectedMetrics := make(map[string]bool)
+    for key := range metrics {
+        expectedMetrics[key] = true
+    }
+    
+    for i := 1; i < runCount; i++ {
+        fmt.Printf("\n===== Run %d of %d =====\n", i+1, runCount)
+        _, metrics := testFunc()
+        
+        completeMetrics := make(map[string]float64)
+        for key := range expectedMetrics {
+            if value, exists := metrics[key]; exists {
+                completeMetrics[key] = value
+            } else {
+                completeMetrics[key] = 0.0
+                fmt.Printf("Warning: Metric '%s' not found in run %d, using 0.0\n", key, i+1)
+            }
+        }
+        
+        allMetrics[i] = completeMetrics
+    }
+    
+    avgMetrics := make(map[string]float64)
+    for key := range expectedMetrics {
+        sum := 0.0
+        count := 0
+        for i := 0; i < runCount; i++ {
+            if value, exists := allMetrics[i][key]; exists {
+                sum += value
+                count++
+            }
+        }
+        if count > 0 {
+            avgMetrics[key] = sum / float64(count)
+        }
+    }
+    
+    params["run_count"] = fmt.Sprintf("%d", runCount)
+    
+    testType := "custom"
+    if _, hasDBSize := params["db_size"]; hasDBSize {
+        if _, hasRecordSize := params["record_size"]; hasRecordSize {
+            if params["record_size"] == "auto" {
+                testType = "dbsize"
+            } else if params["db_size"] == "auto" {
+                testType = "recordsize"
+            } else {
+                testType = "db_recordsize"
+            }
+        }
+    }
+    
+    LogTestResults(fmt.Sprintf("%s_avg", testType), params, avgMetrics)
+    
+    for i := 0; i < runCount; i++ {
+        runParams := make(map[string]string)
+        for k, v := range params {
+            runParams[k] = v
+        }
+        runParams["run_id"] = fmt.Sprintf("%d", i+1)
+        LogTestResults(fmt.Sprintf("%s_runs", testType), runParams, allMetrics[i])
+    }
+}
+
+// RUNS=10 go test -run=TestPIRWithDifferentDBSizesMultiRun
+func TestPIRWithDifferentDBSizesMultiRun(t *testing.T) {
+    dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
+    productID := uint64(54) // first product ID in the database
+    
+    runCount := 3 // default
+    if countStr := os.Getenv("RUNS"); countStr != "" {
+        if count, err := strconv.Atoi(countStr); err == nil && count > 0 {
+            runCount = count
+        }
+    }
+    
+    for _, dbSize := range dbSizes {
+        fmt.Printf("\n\n==== Testing PIR with %d entries (%d runs) ====\n", dbSize, runCount)
+        
+        RunTestMultipleTimes(t, runCount, func() (map[string]string, map[string]float64) {
+            output := CaptureOutput(func() {
+                QueryProductByID(t, productID, dbSize, 0)
+            })
+            
+            metrics := ExtractPIRMetrics(output)
+            
+            params := map[string]string{
+                "db_size": fmt.Sprintf("%d", dbSize),
+                "record_size": "auto",
+            }
+            
+            return params, metrics
+        })
+    }
+}
+
+// RUNS=10 go test -run=TestPIRWithDifferentRecordSizesMultiRun
+func TestPIRWithDifferentRecordSizesMultiRun(t *testing.T) {
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512}
+    productID := uint64(54) // first product ID in the database
+    
+    runCount := 3 // default
+    if countStr := os.Getenv("RUNS"); countStr != "" {
+        if count, err := strconv.Atoi(countStr); err == nil && count > 0 {
+            runCount = count
+        }
+    }
+    
+    for _, recordSize := range recordSizes {
+        fmt.Printf("\n\n==== Testing PIR with record size %d bits (%d runs) ====\n", recordSize, runCount)
+        
+        RunTestMultipleTimes(t, runCount, func() (map[string]string, map[string]float64) {
+            output := CaptureOutput(func() {
+                QueryProductByID(t, productID, 0, recordSize)
+            })
+            
+            metrics := ExtractPIRMetrics(output)
+            
+            params := map[string]string{
+                "db_size": "auto", 
+                "record_size": fmt.Sprintf("%d", recordSize),
+            }
+            
+            return params, metrics
+        })
+    }
+}
+
+// RUNS=5 go test -run=TestPIRWithSizeCombinationsMultiRun
+func TestPIRWithSizeCombinationsMultiRun(t *testing.T) {
+    dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
+    recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512}
+    productID := uint64(54) // first product ID in the database
+
+    runCount := 3 // default
+    if countStr := os.Getenv("RUNS"); countStr != "" {
+        if count, err := strconv.Atoi(countStr); err == nil && count > 0 {
+            runCount = count
+        }
+    }
+    
+    for _, dbSize := range dbSizes {
+        for _, recordSize := range recordSizes {
+            fmt.Printf("\n\n==== Testing PIR with DB size %d and record size %d bits (%d runs) ====\n", 
+                      dbSize, recordSize, runCount)
+            
+            RunTestMultipleTimes(t, runCount, func() (map[string]string, map[string]float64) {
+                output := CaptureOutput(func() {
+                    QueryProductByID(t, productID, dbSize, recordSize)
+                })
+                
+                metrics := ExtractPIRMetrics(output)
+                
+                params := map[string]string{
+                    "db_size": fmt.Sprintf("%d", dbSize),
+                    "record_size": fmt.Sprintf("%d", recordSize),
+                }
+                
+                return params, metrics
+            })
+        }
+    }
 }

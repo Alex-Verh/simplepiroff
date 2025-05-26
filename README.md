@@ -187,4 +187,34 @@ go test -run=TestPIRWithDifferentRecordSizes
 go test -run=TestPIRWithSizeCombinations
 ```
 
+To get more reliable performance metrics, you can run each test multiple times and generate plots from the averaged results.
+
+```bash
+# Navigate to the test directory
+cd simplepir/pir/
+
+# Run database size tests with 10 iterations per size
+RUNS=10 go test -run=TestPIRWithDifferentDBSizesMultiRun
+
+# Run record size tests with 10 iterations per size
+RUNS=10 go test -run=TestPIRWithDifferentRecordSizesMultiRun
+
+# Run combinations with 3 iterations per combination
+# Warning: This can take a long time to complete
+RUNS=5 go test -run=TestPIRWithSizeCombinationsMultiRun
+```
+
+#### Generating Plots from Results
+
+```bash
+# Plot all average result files
+python plot_results.py --avg
+
+# Plot a specific results file
+python plot_results.py results/dbsize_avg_results.csv
+
+# Plot all results files (including individual runs)
+python plot_results.py --all
+```
+
 ---
