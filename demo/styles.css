@@ -1,0 +1,76 @@
+@import url("fonts/fonts.css");
+
+body {
+  font-family: "Cormorant", Arial !important;
+  margin: 0;
+  font-size: 20px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  margin-bottom: 100px;
+}
+
+.nav-links a {
+  margin-inline: 20px;
+}
+
+.logo {
+  font-size: 24px;
+  font-family: "Yesteryear", cursive;
+}
+
+.logo-icon {
+  width: 30px;
+  margin-inline-end: 10px;
+}
+
+.text-section {
+  font-size: 24px;
+}
+
+.content {
+  margin-bottom: 100px;
+}
+
+.search-box {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+}
+
+.search-input,
+.search-button {
+  font-family: "Cormorant", Arial !important;
+  width: 100%;
+  padding: 15px 25px;
+  font-size: 30px;
+  outline: none !important;
+  border: 1px solid #b4b4b4;
+  margin-bottom: 20px;
+}
+
+.search-button {
+  background-color: #f67875;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  border: 1px solid #f67875;
+}
+
+.search-button:hover {
+  box-shadow: 0 2px 4px #f67775ad;
+}
+
+.search-checkbox {
+  cursor: pointer;
+}
+
+.result {
+  margin-bottom: 100px;
+}

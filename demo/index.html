@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PIRuka</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="bootstrap-grid.min.css" />
+  </head>
+  <body>
+    <header class="navbar">
+      <div class="container d-flex justify-content-between align-items-center">
+        <div class="logo d-flex align-items-center">
+          <img src="images/icon.svg" class="logo-icon" alt="" /> PIRuka
+        </div>
+        <nav class="nav-links">
+          <a href="#search">Search</a>
+          <a href="https://github.com/Alex-Verh/simplepiroff">Reference</a>
+          <a href="https://www.linkedin.com/in/alexandru-verhovetchi-845351227/"
+            >Author</a
+          >
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="content">
+        <div class="row">
+          <div class="col-6 justify-content-center align-items-center d-flex">
+            <div class="text-section">
+              <h1>
+                Search for the products you <br />
+                are interested in safely now!
+              </h1>
+              <p>
+                We use private information retrieval (PIR) system,
+                <a href="https://github.com/ahenzinger/simplepir" class="link"
+                  >SimplePIR</a
+                >, to allow our users keep their privacy safe.
+              </p>
+            </div>
+          </div>
+
+          <div class="col-6 justify-content-center align-items-center d-flex">
+            <div class="image-section">
+              <img src="images/illustration.svg" alt="Privacy illustration" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="search" class="search-box">
+        <div class="container">
+          <div class="row gap-5">
+            <div class="col-9">
+              <input
+                type="text"
+                class="search-input"
+                id="search-input"
+                placeholder="Enter product barcode"
+              />
+            </div>
+            <div class="col-3">
+              <button class="search-button" id="search-button">Search</button>
+            </div>
+            <div class="col-12">
+              <label class="search-checkbox">
+                <input type="checkbox" id="privateCheckbox" checked /> Check to
+                search privately
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="result" id="result">No product found.</p>
+    </main>
+
+    <script>
+      document
+        .getElementById("search-button")
+        .addEventListener("click", async () => {
+          const query = document.getElementById("search-input").value.trim();
+          const isPrivate = document.getElementById("privateCheckbox").checked;
+
+          if (!query) {
+            alert("Please enter a barcode.");
+            return;
+          }
+
+          const url = `localhost:3000/search?query=${encodeURIComponent(
+            query
+          )}&private=${isPrivate}`;
+
+          try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            const result = document.getElementById("result");
+            if (response.ok && data && data.name) {
+              result.textContent = `Product found: ${data.name}`;
+              result.style.color = "green";
+            } else {
+              result.textContent = "No product found.";
+              result.style.color = "black";
+            }
+          } catch (error) {
+            console.error("Error fetching data:", error);
+            document.getElementById("result").textContent =
+              "Error retrieving product.";
+          }
+        });
+    </script>
+  </body>
+</html>

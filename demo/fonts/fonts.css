@@ -1,0 +1,29 @@
+@font-face {
+  font-family: "Cormorant";
+  src: local("Cormorant-Regular"), local("Cormorant-Regular"),
+    url("Cormorant-Regular.woff2") format("woff2"),
+    url("Cormorant-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant";
+  src: local("Cormorant-Bold"), local("Cormorant-Bold"),
+    url("Cormorant-Bold.woff2") format("woff2"),
+    url("Cormorant-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Yesteryear";
+  src: local("Yesteryear-Regular"), local("Yesteryear-Regular"),
+    url("Yesteryear-Regular.woff2") format("woff2"),
+    url("Yesteryear-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
