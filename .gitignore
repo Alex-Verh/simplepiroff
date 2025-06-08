@@ -1,5 +1,5 @@
 /db/*
 /venv
 .DS_Store
-/plots
-/results
+/plots/*
+/results/*

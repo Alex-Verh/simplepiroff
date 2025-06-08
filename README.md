@@ -231,7 +231,7 @@ brew services start redis
 #### Load dataset into Redis
 
 ```bash
-go run loader.go ~/Desktop/simplepiroff/db/en.openfoodfacts.org.products.csv
+go run loader.go ../db/en.openfoodfacts.org.products.csv
 ```
 
 #### Run the benchmarks
