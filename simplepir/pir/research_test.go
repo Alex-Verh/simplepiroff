@@ -920,8 +920,8 @@ func RunTestMultipleTimes(t *testing.T, runCount int, testFunc func() (map[strin
     }
 }
 
-// RUNS=10 go test -run=TestPIRWithDifferentDBSizesMultiRun
-func TestPIRWithDifferentDBSizesMultiRun(t *testing.T) {
+// RUNS=10 go test -run=TestPIRWithDifferentDBSizes
+func TestPIRWithDifferentDBSizes(t *testing.T) {
     dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
     productID := uint64(54) // first product ID in the database
     
@@ -952,8 +952,8 @@ func TestPIRWithDifferentDBSizesMultiRun(t *testing.T) {
     }
 }
 
-// RUNS=10 go test -timeout 0 -run=TestPIRWithDifferentRecordSizesMultiRun
-func TestPIRWithDifferentRecordSizesMultiRun(t *testing.T) {
+// RUNS=10 go test -timeout 0 -run=TestPIRWithDifferentRecordSizes
+func TestPIRWithDifferentRecordSizes(t *testing.T) {
     recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512}
     productID := uint64(54) // first product ID in the database
     
@@ -984,8 +984,8 @@ func TestPIRWithDifferentRecordSizesMultiRun(t *testing.T) {
     }
 }
 
-// RUNS=5 go test -run=TestPIRWithSizeCombinationsMultiRun
-func TestPIRWithSizeCombinationsMultiRun(t *testing.T) {
+// RUNS=5 go test -run=TestPIRWithSizeCombinations
+func TestPIRWithSizeCombinations(t *testing.T) {
     dbSizes := []uint64{1, 10, 100, 1000, 10000, 100000, 1000000}
     recordSizes := []uint64{8, 16, 32, 64, 128, 256, 512}
     productID := uint64(54) // first product ID in the database

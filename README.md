@@ -4,7 +4,7 @@ This project runs controlled experiments using the **SimplePIR** protocol on the
 
 ---
 
-## Dataset Setup
+## Dataset and Protocol Setup
 
 ### 1. Download the Dataset (~0.9 GB)
 
@@ -53,73 +53,8 @@ gunzip en.openfoodfacts.org.products.csv.gz
 
 ---
 
-### 3. Convert CSV to PIR Format
 
-Create a virtual environment:
-
-#### ▸ macOS or Linux
-
-```bash
-python3 -m venv venv
-
-source venv/bin/activate
-```
-
-#### ▸ Windows
-
-```bash
-python -m venv venv
-
-venv\Scripts\activate
-```
-
-Install all the dependencies:
-
-#### ▸ macOS or Linux
-
-```bash
-pip3 install -r requirements.txt
-```
-
-#### ▸ Windows
-
-```bash
-pip install -r requirements.txt
-```
-
-From the project root directory, run:
-
-#### ▸ macOS or Linux
-
-```bash
-python3 csv_to_txt.py
-
-python3 txt_to_bin.py
-```
-
-#### ▸ Windows
-
-```bash
-py csv_to_txt.py
-
-py txt_to_bin.py
-```
-
----
-
-## Run protocol over dataset
-
-### 1. Clone SimplePIR repository
-
-In the root directory run:
-
-```bash
-git clone https://github.com/ahenzinger/simplepir.git
-```
-
----
-
-### 2. Setup SimplePIR protocol
+### 3. Setup SimplePIR protocol
 
 Follow up setup indications in `README.md` inside the `./simplepir`
 
@@ -133,9 +68,28 @@ cd ../..
 
 ---
 
-### 3. Research Question 1
+### 4. Convert CSV to PIR Format
 
-#### TestQueryProduct: Queries a specific product ID from the database.
+Convert CSV format into Binary. [~15min]
+
+```bash
+
+go test -timeout 0 -run=TestConvertCSVToBinary
+
+```
+
+Setup database (load key-only file for faster run-time). [~5min]
+
+```bash
+
+SKIP_AUTOLOAD=true go test -timeout 0 -run=TestSetupDatabase
+
+```
+---
+
+## Product Query
+
+### TestQueryProduct: Queries a specific product ID from the database.
 
 1. Set the ID using the PRODUCT_ID environment variable
 2. Uses the full database by default
@@ -164,27 +118,27 @@ PRODUCT_ID=63 go test -run=TestQueryProduct
 
 #### TestPIRWithDifferentRecordSizes: Tests PIR with different record sizes
 
-1. Tests with 8, 16, 32, 64, 128, and 256-bit records
+1. Tests with 8, 16, 32, 64, 128, 256 and 512-bit records
 2. Shows how PIR performs with larger record sizes
 
 #### TestPIRWithSizeCombinations: Tests all combinations of database sizes and record sizes
 
 1. Runs the most comprehensive benchmark
-2. Takes the longest to complete [~1min]
+2. Takes the longest to complete depending on count of runs
 
 ```bash
 # Navigate to the test directory
 cd simplepir/pir/
 
 # Test PIR with different database sizes (10 to 1,000,000 entries)
-go test -run=TestPIRWithDifferentDBSizes
+RUNS=1 go test -run=TestPIRWithDifferentDBSizes
 
 # Test PIR with different record sizes (8 to 256 bits)
-go test -run=TestPIRWithDifferentRecordSizes
+RUNS=1 go test -run=TestPIRWithDifferentRecordSizes
 
 # Test PIR with combinations of different DB sizes and record sizes
 # This will run multiple tests with all combinations
-go test -run=TestPIRWithSizeCombinations
+RUNS=1 go test -run=TestPIRWithSizeCombinations
 ```
 
 To get more reliable performance metrics, you can run each test multiple times and generate plots from the averaged results.
@@ -194,17 +148,49 @@ To get more reliable performance metrics, you can run each test multiple times a
 cd simplepir/pir/
 
 # Run database size tests with 10 iterations per size
-RUNS=10 go test -run=TestPIRWithDifferentDBSizesMultiRun
+RUNS=10 go test -run=TestPIRWithDifferentDBSizes
 
 # Run record size tests with 10 iterations per size
-RUNS=10 go test -run=TestPIRWithDifferentRecordSizesMultiRun
+RUNS=10 go test -run=TestPIRWithDifferentRecordSizes
 
 # Run combinations with 3 iterations per combination
 # Warning: This can take a long time to complete
-RUNS=5 go test -run=TestPIRWithSizeCombinationsMultiRun
+RUNS=5 go test -run=TestPIRWithSizeCombinations
 ```
 
 #### Generating Plots from Results
+
+Create a virtual environment:
+
+##### ▸ macOS or Linux
+
+```bash
+python3 -m venv venv
+
+source venv/bin/activate
+```
+
+##### ▸ Windows
+
+```bash
+python -m venv venv
+
+venv\Scripts\activate
+```
+
+Install all the dependencies:
+
+##### ▸ macOS or Linux
+
+```bash
+pip3 install -r requirements.txt
+```
+
+##### ▸ Windows
+
+```bash
+pip install -r requirements.txt
+```
 
 ```bash
 # Plot all average result files
@@ -217,4 +203,54 @@ python plot_results.py results/dbsize_avg_results.csv
 python plot_results.py --all
 ```
 
+---
+
+### Sub-question II
+
+To compute network time costs of SimplePIR under different bandwidth and latency conditions:
+
+1. Good Network - 100 Mbps bandwidth and 10ms latency
+2. Average Network - 25 Mbps bandwidth and 50ms latency
+3. Poor Network - 5 Mbps bandwidth and 200ms latency
+
+```bash
+# in the ./simplepiroff directory
+go run network_conditions.go
+```
+
+---
+
+### Sub-question III
+
+#### Start Redis
+
+```bash
+brew services start redis
+```
+
+#### Load dataset into Redis
+
+```bash
+go run loader.go ~/Desktop/simplepiroff/db/en.openfoodfacts.org.products.csv
+```
+
+#### Run the benchmarks
+
+Different database sizes benchmark:
+
+```bash
+go run dbsize_benchmark.go [ID_NUMBER] [RUNS_COUNT]
+```
+
+Different record sizes benchmark:
+
+```bash
+go run recordsize_benchmark.go [ID_NUMBER] [RUNS_COUNT]
+```
+
+#### Stop Redis
+
+```bash
+brew services stop redis
+```
 ---
