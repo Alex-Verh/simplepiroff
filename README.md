@@ -111,6 +111,8 @@ PRODUCT_ID=63 go test -run=TestQueryProduct
 
 ### Sub-question I 
 
+- All the controlled experiments related to RQ 1 can be found in the ```simplepir/pir/research_test.go``` file. 
+
 #### TestPIRWithDifferentDBSizes: Tests PIR performance with varying database sizes
 
 1. Tests with 10, 100, 1,000, 10,000, 100,000, and 1,000,000 entries
@@ -206,6 +208,8 @@ python plot_results.py --all
 
 ### Sub-question II
 
+- All the controlled experiments related to RQ 2 can be found in the ```./network_conditions.go``` file. 
+
 To compute network time costs of SimplePIR under different bandwidth and latency conditions:
 
 1. Good Network - 100 Mbps bandwidth and 10ms latency
@@ -220,6 +224,8 @@ go run network_conditions.go
 ---
 
 ### Sub-question III
+
+- All the controlled experiments related to RQ 3 can be found in the ```./redis``` directory. 
 
 #### Start Redis
 
@@ -255,6 +261,8 @@ brew services stop redis
 ---
 
 ### Sub-question IV
+
+- All the controlled experiments related to RQ 4 can be found in the ```./demo``` directory. 
 
 #### Start Redis
 ```bash
