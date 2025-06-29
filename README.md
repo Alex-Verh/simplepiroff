@@ -257,21 +257,34 @@ brew services stop redis
 ### Sub-question IV
 
 #### Start Redis
+```bash
 brew services start redis
+```
 
 #### Clean wasm javascript file (if present)
+```bash
 rm -f pir.wasm wasm_exec.js
+```
 
 #### Compute fresh wasm_exec.js
+```bash
 cp /opt/homebrew/Cellar/go/1.24.2/libexec/lib/wasm/wasm_exec.js .
+```
 
 #### Build fresh WASM
+```bash
 cd wasm
 go clean -cache
 GOOS=js GOARCH=wasm go build -o ../pir.wasm .
 cd ..
+```
 
 #### Start demo server
+```bash
 go run main.go
+```
 
+#### Test query barcodes
+
+Use ```test_barcodes.txt``` for barcodes examples.
 ---
