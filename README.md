@@ -286,5 +286,5 @@ go run main.go
 
 #### Test query barcodes
 
-Use ```test_barcodes.txt``` for barcodes examples.
+##### Use ```test_barcodes.txt``` for barcodes examples.
 ---
