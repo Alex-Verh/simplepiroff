@@ -74,42 +74,329 @@
       </section>
 
       <p class="result" id="result">No product found.</p>
+
+      <div class="product-details" id="product-details" style="display: none;">
+        <h4>Product Details</h4>
+        <div class="product-grid" id="product-grid">
+        </div>
+      </div>
+
+      <div class="performance-metrics" id="performance-metrics">
+        <h4 >Performance Metrics</h4>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <strong>Query Time:</strong> <span id="query-time">-</span>
+          </div>
+          <div class="metric-item">
+            <strong>Privacy Level:</strong> <span id="privacy-level">-</span>
+          </div>
+          <div class="metric-item">
+            <strong>Method Used:</strong> <span id="method-used">-</span>
+          </div>
+          <div class="metric-item">
+            <strong>Barcode:</strong> <span id="barcode-queried">-</span>
+          </div>
+        </div>
+        <div class="privacy-explanation">
+          <div id="privacy-explanation">-</div>
+        </div>
+      </div>
     </main>
 
+    <script src="wasm_exec.js"></script>
     <script>
-      document
-        .getElementById("search-button")
-        .addEventListener("click", async () => {
-          const query = document.getElementById("search-input").value.trim();
-          const isPrivate = document.getElementById("privateCheckbox").checked;
+      let wasmPIRReady = false;
+      let serverPIRReady = false;
 
-          if (!query) {
-            alert("Please enter a barcode.");
-            return;
+      function startPerformanceTimer() {
+        return performance.now();
+      }
+
+      function endPerformanceTimer(startTime) {
+        return Math.round(performance.now() - startTime);
+      }
+
+      function updatePerformanceMetrics(queryTime, searchMethod, barcode, privacyLevel) {
+        const metricsElement = document.getElementById("performance-metrics");
+        const queryTimeElement = document.getElementById("query-time");
+        const privacyLevelElement = document.getElementById("privacy-level");
+        const methodUsedElement = document.getElementById("method-used");
+        const barcodeQueriedElement = document.getElementById("barcode-queried");
+        const privacyExplanationElement = document.getElementById("privacy-explanation");
+
+        queryTimeElement.textContent = `${queryTime}ms`;
+        privacyLevelElement.textContent = privacyLevel;
+        methodUsedElement.textContent = searchMethod;
+        barcodeQueriedElement.textContent = barcode;
+
+        let explanation = "";
+        let privacyColor = "";
+        
+
+        if (searchMethod.includes("Server PIR")) {
+          explanation = "Privacy: SimplePIR used on server.";
+          privacyColor = "#ffc107";
+        } else {
+          explanation = "No Privacy: Redis used on server.";
+          privacyColor = "#dc3545";
+        }
+        
+        privacyExplanationElement.textContent = explanation;
+        privacyExplanationElement.style.color = privacyColor;
+        privacyLevelElement.style.color = privacyColor;
+
+        metricsElement.style.display = "block";
+      }
+
+      class PIRCrypto {
+        static encrypt(data, key = 'simplepir') {
+          let encrypted = '';
+          for (let i = 0; i < data.length; i++) {
+            encrypted += String.fromCharCode(data.charCodeAt(i) ^ key.charCodeAt(i % key.length));
           }
+          return encrypted;
+        }
 
-          const url = `localhost:3000/search?query=${encodeURIComponent(
-            query
-          )}&private=${isPrivate}`;
+        static decrypt(encryptedData, key = 'simplepir') {
+          let decrypted = '';
+          for (let i = 0; i < encryptedData.length; i++) {
+            decrypted += String.fromCharCode(encryptedData.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+          }
+          return decrypted;
+        }
+      }
 
-          try {
-            const response = await fetch(url);
-            const data = await response.json();
+async function initializePIR() {
+  try {
+    console.log("Loading PIR WASM module...");
+    
+    const go = new Go();
+    const result = await WebAssembly.instantiateStreaming(fetch("pir.wasm"), go.importObject);
+    go.run(result.instance);
+    
+    const wasmReady = window.initializePIR(100000, 64);
+    
+    wasmPIRReady = wasmReady;
+    
+    if (wasmPIRReady) {
+    } else {
+      throw new Error("WASM PIR returned false");
+    }
+  } catch (error) {
+    wasmPIRReady = false;
+    
+    try {
+      const healthResponse = await fetch('/health');
+      if (healthResponse.ok) {
+        serverPIRReady = true;
+      }
+    } catch (serverError) {
+    }
+  }
+}
 
-            const result = document.getElementById("result");
-            if (response.ok && data && data.name) {
-              result.textContent = `Product found: ${data.name}`;
-              result.style.color = "green";
+async function wasmPIRSearch(barcode) {
+  if (!wasmPIRReady) {
+    throw new Error("WASM PIR not initialized");
+  }
+  
+  try {
+    const pirQuery = window.generateRealPIRQuery(parseInt(barcode));
+    
+    if (pirQuery.error) {
+      throw new Error(pirQuery.error);
+    }
+    
+    const response = await fetch('/pir-protocol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pirQuery: Array.from(pirQuery.query),
+        metadata: {
+          timestamp: pirQuery.timestamp,
+          originalBarcode: pirQuery.originalBarcode,
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`PIR protocol error: ${response.status}`);
+    }
+    
+    const serverResponse = await response.json();
+    
+    if (serverResponse.productData?.error) {
+      return {
+        error: serverResponse.productData.error,
+        barcode: barcode,
+        method: "Simple PIR"
+      };
+    }
+    
+    const reconstructed = window.reconstructPIRResult(
+      serverResponse.encryptedResult, 
+      pirQuery.queryIndex
+    );
+    
+    if (reconstructed.error) {
+      throw new Error(reconstructed.error);
+    }
+    
+    return {
+      name: serverResponse.productData?.name || `Product ${barcode}`,
+      barcode: barcode,
+      allData: serverResponse.productData,
+      method: "Simple PIR"
+    };
+    
+  } catch (error) {
+    return await serverPIRSearch(barcode);
+  }
+}
+
+async function serverPIRSearch(barcode) {
+  const queryData = JSON.stringify({ barcode: barcode });
+  const encryptedQuery = PIRCrypto.encrypt(queryData);
+
+  const response = await fetch(`/search?query=${encodeURIComponent(encryptedQuery)}&private=true`);
+        
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.encrypted && result.result) {
+          const decryptedResult = PIRCrypto.decrypt(result.result);
+          return JSON.parse(decryptedResult);
+        }
+        
+        return result;
+      }
+
+      async function regularSearch(barcode) {
+        const response = await fetch(`/search?query=${encodeURIComponent(barcode)}&private=false`);
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+        return response.json();
+      }
+
+      document.getElementById("search-button").addEventListener("click", async () => {
+        const query = document.getElementById("search-input").value.trim();
+        const isPrivate = document.getElementById("privateCheckbox").checked;
+
+        if (!query) {
+          alert("Please enter a barcode.");
+          return;
+        }
+
+        const resultElement = document.getElementById("result");
+        resultElement.textContent = isPrivate ? "Running PIR query..." : "Searching...";
+        resultElement.style.color = "blue";
+
+        document.getElementById("product-details").style.display = "none";
+
+        const startTime = startPerformanceTimer();
+
+        try {
+          let result;
+          
+          if (isPrivate) {
+            if (wasmPIRReady) {
+              result = await wasmPIRSearch(query);
+            } else if (serverPIRReady) {
+              result = await serverPIRSearch(query);
             } else {
-              result.textContent = "No product found.";
-              result.style.color = "black";
+              throw new Error("No PIR system available");
             }
-          } catch (error) {
-            console.error("Error fetching data:", error);
-            document.getElementById("result").textContent =
-              "Error retrieving product.";
+          } else {
+            result = await regularSearch(query);
           }
-        });
+
+          const queryTime = endPerformanceTimer(startTime);
+
+          if (result.error) {
+            resultElement.textContent = result.error;
+            resultElement.style.color = "red";
+          } else if (result.name || result.allData) {
+            const searchMethod = isPrivate ? "Server PIR" : "Regular";
+            resultElement.textContent = `Product found (${searchMethod}): ${result.name || 'Product ' + query}`;
+            resultElement.style.color = "green";
+            
+            displayProductDetails(result);
+            
+            const privacyLevel = isPrivate ? "Private" : "None";
+            updatePerformanceMetrics(queryTime, searchMethod, query, privacyLevel);
+          } else {
+            resultElement.textContent = "No product found.";
+            resultElement.style.color = "orange";
+            
+            const searchMethod = isPrivate ? "Server PIR" : "Regular";
+            const privacyLevel = isPrivate ? "Private" : "None";
+            updatePerformanceMetrics(queryTime, searchMethod, query, privacyLevel);
+          }
+
+        } catch (error) {
+          const queryTime = endPerformanceTimer(startTime);
+          
+          console.error("Search error:", error);
+          resultElement.textContent = `Search failed: ${error.message}`;
+          resultElement.style.color = "red";
+          
+          updatePerformanceMetrics(queryTime, "Error", query, "Unknown");
+        }
+      });
+      document.getElementById("search-input").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          document.getElementById("search-button").click();
+        }
+      });
+
+      window.addEventListener("load", async () => {
+        console.log("Initializing PIR system...");
+        await initializePIR();
+      });
+
+      function displayProductDetails(productData) {
+        const detailsElement = document.getElementById("product-details");
+        const gridElement = document.getElementById("product-grid");
+        
+        gridElement.innerHTML = "";
+        
+        if (productData.allData) {
+          const sortedFields = Object.keys(productData.allData).sort();
+          
+          sortedFields.forEach(key => {
+            const value = productData.allData[key];
+            
+            const fieldDiv = document.createElement("div");
+            fieldDiv.className = "product-field";
+            
+            const labelDiv = document.createElement("div");
+            labelDiv.className = "field-label";
+            labelDiv.textContent = key.replace(/_/g, ' ').toUpperCase();
+            
+            const valueDiv = document.createElement("div");
+            valueDiv.className = "field-value";
+            
+            let displayValue = value;
+            if (value.length > 200) {
+              displayValue = value.substring(0, 200) + "...";
+            }
+            valueDiv.textContent = displayValue;
+            valueDiv.title = value;
+            
+            fieldDiv.appendChild(labelDiv);
+            fieldDiv.appendChild(valueDiv);
+            gridElement.appendChild(fieldDiv);
+          });
+          
+          detailsElement.style.display = "block";
+        } else {
+          detailsElement.style.display = "none";
+        }
+      }
     </script>
   </body>
 </html>

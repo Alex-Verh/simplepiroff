@@ -72,5 +72,62 @@ a {
 }
 
 .result {
-  margin-bottom: 100px;
+  margin-bottom: 20px;
+}
+
+.performance-metrics {
+  margin-top: 20px; 
+  margin-bottom: 200px;
+  padding: 15px; 
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: none;
+  background-color: #f1f1f1;
+}
+
+.performance-metrics h4 {
+  margin: 0 0 10px 0; 
+  color: #495057;
+}
+
+.metrics-grid {
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 15px;
+}
+
+.privacy-explanation {
+  margin-top: 10px; 
+  font-size: 0.9em; 
+  color: #6c757d;
+}
+
+.product-details {
+  margin-top: 20px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #f1f1f1;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.product-field {
+  display: contents;
+}
+
+.field-label {
+  font-weight: bold;
+  padding: 8px;
+  background-color: #e9ecef;
+}
+
+.field-value {
+  padding: 8px;
+  background-color: white;
+  word-wrap: break-word;
 }

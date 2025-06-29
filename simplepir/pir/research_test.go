@@ -94,7 +94,7 @@ func LoadEnhancedCSVDatabase(csvPath string, keyColumn string, recordBitLength u
             break
         }
         if err != nil {
-            fmt.Printf("Warning: skipping malformed record at line %d: %v\n", recordCount+2, err)
+            fmt.Printf("Skipping malformed record at line %d: %v\n", recordCount+2, err)
             continue
         }
         
@@ -321,7 +321,7 @@ func LoadDatabaseOnce() (*EnhancedDatabase, []uint64, []string, uint64, error) {
         
         fmt.Println("Creating keys-only cache for future use...")
         if saveErr := CreateKeysOnlyBinary(binPath, keysOnlyPath); saveErr != nil {
-            fmt.Printf("Warning: Could not create keys-only cache: %v\n", saveErr)
+            fmt.Printf("Could not create keys-only cache: %v\n", saveErr)
         }
         
     } else if _, err := os.Stat(csvPath); err == nil {
@@ -334,7 +334,7 @@ func LoadDatabaseOnce() (*EnhancedDatabase, []uint64, []string, uint64, error) {
         
         fmt.Println("Saving binary version for future use...")
         if saveErr := SaveEnhancedBinaryDatabase(globalDB, binPath); saveErr != nil {
-            fmt.Printf("Warning: Could not save binary version: %v\n", saveErr)
+            fmt.Printf("Could not save binary version: %v\n", saveErr)
         }
     } else {
         return nil, nil, nil, 0, fmt.Errorf("no database files found")
@@ -533,7 +533,7 @@ func ConvertCSVToBinaryStreamOptimized(csvPath, binPath string, maxRecords uint6
             break
         }
         if err != nil {
-            fmt.Printf("Warning: skipping malformed record at line %d: %v\n", recordCount+2, err)
+            fmt.Printf("Skipping malformed record at line %d: %v\n", recordCount+2, err)
             continue
         }
         
@@ -605,7 +605,6 @@ func CaptureOutput(f func()) string {
 }
 
 func ExtractPIRMetrics(output string) map[string]float64 {
-    // Initialize all expected metrics with zero values
     metrics := map[string]float64{
         "setup_time":       0.0,
         "query_time":       0.0,
@@ -616,7 +615,6 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         "online_download":  0.0,
     }
     
-    // Time metrics regex patterns
     timePatterns := map[string]string{
         "setup_time":       `Setup\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
         "query_time":       `Building query\.\.\.\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
@@ -624,7 +622,6 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         "reconstruct_time": `Reconstructing\.\.\.\s+Success!\s+Elapsed: ([\d\.]+)(µs|ms|s)`,
     }
     
-    // Data transfer metrics regex patterns
     dataPatterns := map[string]string{
         "offline_download": `Offline download: ([\d\.]+) KB`,
         "online_upload":    `Online upload: ([\d\.]+) KB`,
@@ -640,10 +637,9 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         }
     }
     
-    // Keep track of which metrics were found
     metricsFound := make(map[string]bool)
     
-    // Extract time metrics (they have units like µs, ms, s)
+    // extract time metrics
     for name, pattern := range timePatterns {
         re := regexp.MustCompile(pattern)
         if matches := re.FindStringSubmatch(output); len(matches) >= 3 {
@@ -653,7 +649,7 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         }
     }
     
-    // Extract data transfer metrics (they are in KB)
+    // extract data transfer metrics
     for name, pattern := range dataPatterns {
         re := regexp.MustCompile(pattern)
         if matches := re.FindStringSubmatch(output); len(matches) >= 2 {
@@ -663,10 +659,9 @@ func ExtractPIRMetrics(output string) map[string]float64 {
         }
     }
     
-    // Debug: print warning for missing metrics
     for name := range metrics {
         if !metricsFound[name] {
-            fmt.Printf("Warning: Metric '%s' not found in output\n", name)
+            fmt.Printf("Metric '%s' not found in output\n", name)
         }
     }
     
@@ -685,7 +680,7 @@ func LogTestResults(testName string, params map[string]string, metrics map[strin
     
     file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     if err != nil {
-        fmt.Printf("Warning: Failed to log results: %v\n", err)
+        fmt.Printf("Failed to log results: %v\n", err)
         return
     }
     defer file.Close()
@@ -834,7 +829,7 @@ func TestQueryProduct(t *testing.T) {
         if id, err := strconv.ParseUint(idStr, 10, 64); err == nil {
             productID = id
         } else {
-            fmt.Printf("Warning: Invalid PRODUCT_ID value '%s', using default 54\n", idStr)
+            fmt.Printf("Invalid PRODUCT_ID value '%s', using default 54\n", idStr)
         }
     }
     
@@ -871,7 +866,7 @@ func RunTestMultipleTimes(t *testing.T, runCount int, testFunc func() (map[strin
                 completeMetrics[key] = value
             } else {
                 completeMetrics[key] = 0.0
-                fmt.Printf("Warning: Metric '%s' not found in run %d, using 0.0\n", key, i+1)
+                fmt.Printf("Metric '%s' not found in run %d, using 0.0\n", key, i+1)
             }
         }
         

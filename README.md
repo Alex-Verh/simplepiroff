@@ -154,7 +154,6 @@ RUNS=10 go test -run=TestPIRWithDifferentDBSizes
 RUNS=10 go test -run=TestPIRWithDifferentRecordSizes
 
 # Run combinations with 3 iterations per combination
-# Warning: This can take a long time to complete
 RUNS=5 go test -run=TestPIRWithSizeCombinations
 ```
 
@@ -253,4 +252,26 @@ go run recordsize_benchmark.go [ID_NUMBER] [RUNS_COUNT]
 ```bash
 brew services stop redis
 ```
+---
+
+### Sub-question IV
+
+#### Start Redis
+brew services start redis
+
+#### Clean wasm javascript file (if present)
+rm -f pir.wasm wasm_exec.js
+
+#### Compute fresh wasm_exec.js
+cp /opt/homebrew/Cellar/go/1.24.2/libexec/lib/wasm/wasm_exec.js .
+
+#### Build fresh WASM
+cd wasm
+go clean -cache
+GOOS=js GOARCH=wasm go build -o ../pir.wasm .
+cd ..
+
+#### Start demo server
+go run main.go
+
 ---

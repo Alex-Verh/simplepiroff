@@ -686,3 +686,4 @@ func BenchmarkDoublePirBatchLarge(b *testing.B) {
 			strconv.FormatFloat(avg(tputs), 'f', 4, 64)})
 	}
 }
+

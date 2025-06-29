@@ -2,6 +2,10 @@ package pir
 
 import "math"
 import "fmt"
+import "bufio"
+import "os"
+import "strconv"
+import "strings"
 
 type DBinfo struct {
 	Num        uint64 // number of DB entries.
@@ -211,4 +215,40 @@ func MakeDB(Num, row_length uint64, p *Params, vals []uint64) *Database {
 	D.Data.Sub(p.P / 2)
 
 	return D
+}
+
+// LoadDBFromFile loads a database from a text file where each line is a uint64 value.
+func LoadDBFromFile(path string, rowLength uint64, p *Params) *Database {
+    file, err := os.Open(path)
+    if err != nil {
+        panic(err)
+    }
+    defer file.Close()
+
+    var vals []uint64
+
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        line := strings.TrimSpace(scanner.Text())
+        if line == "" {
+            continue
+        }
+        // Split on colon, tab, or space
+        fields := strings.FieldsFunc(line, func(r rune) bool {
+            return r == ':' || r == '\t' || r == ' '
+        })
+        if len(fields) == 0 {
+            continue
+        }
+        val, err := strconv.ParseUint(fields[0], 10, 64)
+        if err != nil {
+            continue // skip lines that don't start with a number
+        }
+        vals = append(vals, val)
+    }
+    if err := scanner.Err(); err != nil {
+        panic(err)
+    }
+
+    return MakeDB(uint64(len(vals)), rowLength, p, vals)
 }
