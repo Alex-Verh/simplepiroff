@@ -212,9 +212,9 @@ python plot_results.py --all
 
 To compute network time costs of SimplePIR under different bandwidth and latency conditions:
 
-1. Good Network - 100 Mbps bandwidth and 10ms latency
-2. Average Network - 25 Mbps bandwidth and 50ms latency
-3. Poor Network - 5 Mbps bandwidth and 200ms latency
+1. Good Network - 300 Mbps bandwidth and 10ms latency
+2. Average Network - 100 Mbps bandwidth and 50ms latency
+3. Poor Network - 25 Mbps bandwidth and 200ms latency
 
 ```bash
 # in the ./simplepiroff directory
